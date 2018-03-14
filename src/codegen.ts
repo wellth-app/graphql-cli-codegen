@@ -10,10 +10,24 @@ import { difference } from "lodash";
 
 const TEMPORARY_SCHEMA_PATH = "/tmp/schema.json";
 
+const writeFile = promisify(fs.writeFile);
+const readFile = promisify(fs.readFile);
+
 export const command = "codegen [--target] [--output]";
 export const desc =
   "Generates apollo-codegen code/annotations from your .graphqlconfig";
-export const builder = {};
+export const builder = {
+  output: {
+    alias: "o",
+    describe: "Output file",
+    type: "string",
+  },
+  schema: {
+    alias: "s",
+    describe: "Schema to generate `includes` minus `excludes` against.",
+    type: "string",
+  },
+};
 
 const loadGlob = async (paths: string[] = []): Promise<string[]> => {
   const normalizedPaths = await Promise.all(
@@ -35,56 +49,45 @@ const loadGlob = async (paths: string[] = []): Promise<string[]> => {
   }, []);
 };
 
-const mergeSchemas = async (schemaPaths: string[]): Promise<GraphQLSchema> => {
-  return await buildASTSchema(
-    parse(
-      mergeTypes(
-        schemaPaths.map(value => fs.readFileSync(value, "utf8").toString())
-      )
-    )
-  );
-};
-
-const writeSchema = async (
-  schema: GraphQLSchema,
-  outputPath: string
-): Promise<void> => {
-  const results = await graphql(schema, introspectionQuery);
-  await promisify(fs.writeFile)(outputPath, JSON.stringify(results));
-};
-
 export const handler = async (context, argv) => {
-  const { project } = argv;
+  const { project, schema: argSchema } = argv;
   const { getProjectConfig } = context;
   const { config, configPath } = await getProjectConfig(project);
   const {
-    extensions: { codegen: options = {} } = {},
     includes = [],
     excludes = [],
-    schemaPath,
+    schemaPath: projectSchema,
+    extensions: {
+      codegen: {
+        target = "swift",
+        tagName = "gql",
+        output = "codegen",
+        schemaPath: providedSchema = undefined,
+      } = {},
+    } = {},
   } = config;
-  const {
-    target = "swift",
-    tagName = "gql",
-    output = "codegen",
-    mergedSchemaOutputPath = TEMPORARY_SCHEMA_PATH,
-    schemas = [],
-  } = options;
 
-  const outputPath = path.resolve(mergedSchemaOutputPath);
+  let schemaPath = argSchema ? argSchema : providedSchema || projectSchema;
+
   const inputFiles = difference(
     await loadGlob(includes),
     await loadGlob(excludes)
   ).map(file => path.resolve(file));
 
-  const schema = await mergeSchemas(await loadGlob(schemas));
+  if (schemaPath.endsWith(".graphql")) {
+    const schemaString = await readFile(schemaPath, "utf8");
+    const schema = await buildASTSchema(parse(schemaString));
+    const results = await graphql(schema, introspectionQuery);
+
+    schemaPath = TEMPORARY_SCHEMA_PATH;
+    await writeFile(schemaPath, JSON.stringify(results));
+  }
 
   try {
-    await writeSchema(schema, outputPath);
-    generate(inputFiles, outputPath, output, "", target, tagName, project, {
+    generate(inputFiles, schemaPath, output, "", target, tagName, project, {
       addTypename: true,
     });
   } catch (error) {
-    console.log("error:", error);
+    console.log(error);
   }
 };

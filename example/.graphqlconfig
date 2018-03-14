@@ -1,5 +1,5 @@
 {
-  "schemaPath": "schema.json",
+  "schemaPath": "schema.graphql",
   "includes": [
     "query.graphql",
     "mutations.graphql"
@@ -7,9 +7,7 @@
   "extensions": {
     "codegen": {
       "target": "flow",
-      "schemas": ["schema.graphql"],
-      "output": "annotations.flow.js",
-      "mergedSchemaOutputPath": "schema.json"
+      "output": "annotations.flow.js"
     }
   }
 }
