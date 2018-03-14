@@ -84,20 +84,16 @@ export const handler = async (context, argv) => {
     await writeFile(resolvedSchemaPath, JSON.stringify(results));
   }
 
-  try {
-    generate(
-      inputFiles,
-      resolvedSchemaPath,
-      output,
-      "",
-      target,
-      tagName,
-      project,
-      {
-        addTypename: true,
-      }
-    );
-  } catch (error) {
-    console.log(error);
-  }
+  generate(
+    inputFiles,
+    resolvedSchemaPath,
+    output,
+    "",
+    target,
+    tagName,
+    project,
+    {
+      addTypename: true,
+    }
+  );
 };
