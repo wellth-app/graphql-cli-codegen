@@ -67,26 +67,36 @@ export const handler = async (context, argv) => {
     } = {},
   } = config;
 
-  let schemaPath = argSchema ? argSchema : providedSchema || projectSchema;
+  const schemaPath = argSchema ? argSchema : providedSchema || projectSchema;
 
   const inputFiles = difference(
     await loadGlob(includes),
     await loadGlob(excludes)
   ).map(file => path.resolve(file));
 
+  let resolvedSchemaPath = path.resolve(schemaPath);
   if (schemaPath.endsWith(".graphql")) {
-    const schemaString = await readFile(schemaPath, "utf8");
+    const schemaString = await readFile(resolvedSchemaPath, "utf8");
     const schema = await buildASTSchema(parse(schemaString));
     const results = await graphql(schema, introspectionQuery);
 
-    schemaPath = TEMPORARY_SCHEMA_PATH;
-    await writeFile(schemaPath, JSON.stringify(results));
+    resolvedSchemaPath = TEMPORARY_SCHEMA_PATH;
+    await writeFile(resolvedSchemaPath, JSON.stringify(results));
   }
 
   try {
-    generate(inputFiles, schemaPath, output, "", target, tagName, project, {
-      addTypename: true,
-    });
+    generate(
+      inputFiles,
+      resolvedSchemaPath,
+      output,
+      "",
+      target,
+      tagName,
+      project,
+      {
+        addTypename: true,
+      }
+    );
   } catch (error) {
     console.log(error);
   }
